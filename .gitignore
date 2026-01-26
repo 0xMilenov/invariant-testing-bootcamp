@@ -1,0 +1,14 @@
+# Foundry
+/out/
+/cache/
+/broadcast/
+/coverage/
+lcov.info
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Misc
+*.log
