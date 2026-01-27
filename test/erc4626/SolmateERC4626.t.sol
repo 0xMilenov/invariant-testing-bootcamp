@@ -140,4 +140,253 @@ contract SolmateERC4626_Test is Test {
         assertEq(maxMint, type(uint256).max);
 
     }
+
+    //////////////////////////////////////////////////////////////
+    ////////////////////// WITHDRAW & REDEEM /////////////////////
+    //////////////////////////////////////////////////////////////
+
+    function test_withdraw_burnsShares_andEmitsWithdrawEvent() public {
+
+        uint256 assets = 100e18;
+        uint256 shares = vault.previewWithdraw(assets);
+
+        vm.startPrank(alice);
+
+        vault.deposit(assets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(alice, alice, alice, assets, shares);
+        uint256 sharesBurned = vault.withdraw(assets, alice, alice);
+
+        assertEq(sharesBurned, shares);
+        assertEq(vault.balanceOf(alice), 0);
+        assertEq(asset.balanceOf(alice), 1_000_000e18);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_withdraw_nonOwner_infinteApproval() public {
+
+        uint256 initialAssetBalanceOfBob = asset.balanceOf(bob);
+
+        uint256 assets = 100e18;
+        uint256 shares = vault.previewWithdraw(assets);
+
+        vm.startPrank(alice);
+        vault.approve(bob, type(uint256).max);
+
+        vault.deposit(assets, alice);
+
+        assertEq(vault.balanceOf(alice), shares);
+
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(bob, bob, alice, assets, shares);
+        uint256 sharesBurned = vault.withdraw(assets, bob, alice);
+
+        assertEq(vault.allowance(alice, bob), type(uint256).max);
+
+        assertEq(sharesBurned, shares);
+        assertEq(vault.balanceOf(bob), 0);
+        assertEq(asset.balanceOf(bob), assets + initialAssetBalanceOfBob);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_withdraw_nonOwner_concreteApproval() public {
+        
+        uint256 initialAssetBalanceOfBob = asset.balanceOf(bob);
+
+        uint256 assets = 100e18;
+        uint256 shares = vault.previewWithdraw(assets);
+
+        vm.startPrank(alice);
+        vault.approve(bob, shares); // concrete approval
+
+        vault.deposit(assets, alice);
+
+        assertEq(vault.balanceOf(alice), shares);
+
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(bob, bob, alice, assets, shares);
+        uint256 sharesBurned = vault.withdraw(assets, bob, alice);
+
+        assertEq(vault.allowance(alice, bob), 0); // approval is burned
+
+        assertEq(sharesBurned, shares);
+        assertEq(vault.balanceOf(bob), 0);
+        assertEq(asset.balanceOf(bob), assets + initialAssetBalanceOfBob);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_redeem_burnsShares_andEmitsRedeemEvent() public {
+        uint256 shares = 100e18;
+        uint256 expectedAssets = vault.previewRedeem(shares);
+
+        vm.startPrank(alice);
+
+        vault.deposit(expectedAssets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(alice, alice, alice, expectedAssets, shares);
+        uint256 assetsBurned = vault.redeem(shares, alice, alice);
+
+        assertEq(assetsBurned, expectedAssets);
+        assertEq(vault.balanceOf(alice), 0);
+        assertEq(asset.balanceOf(alice), 1_000_000e18);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_redeem_withDifferentReceiver() public {
+        uint256 shares = 100e18;
+        uint256 expectedAssets = vault.previewRedeem(shares);
+        uint256 initialAssetBalanceOfBob = asset.balanceOf(bob);
+
+        vm.startPrank(alice);
+        vault.deposit(expectedAssets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        vault.approve(bob, shares);
+
+        vm.startPrank(bob);
+
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(bob, bob, alice, expectedAssets, shares);
+        uint256 assetsBurned = vault.redeem(shares, bob, alice);
+
+        assertEq(assetsBurned, expectedAssets);
+        assertEq(vault.balanceOf(bob), 0);
+        assertEq(asset.balanceOf(bob), expectedAssets + initialAssetBalanceOfBob);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_redeem_nonOwner_infinteApproval() public {
+        uint256 shares = 100e18;
+        uint256 expectedAssets = vault.previewRedeem(shares);
+        uint256 initialAssetBalanceOfBob = asset.balanceOf(bob);
+
+        vm.startPrank(alice);
+        vault.deposit(expectedAssets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        vault.approve(bob, type(uint256).max);
+
+        vm.startPrank(bob);
+
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(bob, bob, alice, expectedAssets, shares);
+        uint256 assetsBurned = vault.redeem(shares, bob, alice);
+
+        assertEq(vault.allowance(alice, bob), type(uint256).max); // same
+
+        assertEq(assetsBurned, expectedAssets);
+        assertEq(vault.balanceOf(bob), 0);
+        assertEq(asset.balanceOf(bob), expectedAssets + initialAssetBalanceOfBob);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_redeem_nonOwner_concreteApproval() public {
+        uint256 shares = 100e18;
+        uint256 expectedAssets = vault.previewRedeem(shares);
+        uint256 initialAssetBalanceOfBob = asset.balanceOf(bob);
+
+        vm.startPrank(alice);
+        vault.deposit(expectedAssets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        vault.approve(bob, shares); // concrete approval
+
+        vm.startPrank(bob);
+
+        vm.expectEmit(true, true, true, true);
+        emit Withdraw(bob, bob, alice, expectedAssets, shares);
+        uint256 assetsBurned = vault.redeem(shares, bob, alice);
+
+        assertEq(vault.allowance(alice, bob), 0); // approval is burned
+
+        assertEq(assetsBurned, expectedAssets);
+        assertEq(vault.balanceOf(bob), 0);
+        assertEq(asset.balanceOf(bob), expectedAssets + initialAssetBalanceOfBob);
+        assertEq(vault.totalSupply(), 0);
+        assertEq(vault.totalAssets(), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_redeem_reverts_ZERO_ASSETS_ifSharesAreZero() public {
+        vm.startPrank(alice);
+
+        vault.deposit(100e18, alice);
+        assertGt(vault.totalSupply(), 0);
+
+        asset.burn(address(vault), asset.balanceOf(address(vault)));
+        assertEq(vault.totalAssets(), 0);
+
+        vm.expectRevert("ZERO_ASSETS");
+        vault.redeem(1, alice, alice);
+
+        vm.stopPrank();
+    }
+
+    function test_maxWithdraw_returnsBalanceOfOwner() public {
+
+        uint256 maxWithdraw = vault.maxWithdraw(alice);
+        assertEq(maxWithdraw, vault.balanceOf(alice));
+
+    }
+
+    function test_maxRedeem_returnsBalanceOfOwner() public {
+        uint256 maxRedeem = vault.maxRedeem(alice);
+        assertEq(maxRedeem, vault.balanceOf(alice));
+    }
+
+    function test_convertToAssets_returnsExpectedAssets() public {
+        uint256 shares = 100e18;
+        uint256 expectedAssets = vault.previewRedeem(shares);
+
+        vm.startPrank(alice);
+        vault.deposit(expectedAssets, alice);
+        assertEq(vault.balanceOf(alice), shares);
+
+        uint256 assets = vault.convertToAssets(shares);
+        assertEq(assets, expectedAssets);
+    }
+
+    function test_convertToShares_returnsExpectedShares() public {
+        uint256 assets = 100e18;
+        uint256 expectedShares = vault.previewDeposit(assets);
+
+        vm.startPrank(alice);
+        vault.deposit(assets, alice);
+        assertEq(vault.balanceOf(alice), expectedShares);
+
+        uint256 shares = vault.convertToShares(assets);
+        assertEq(shares, expectedShares);
+
+        vm.stopPrank();
+    }
+
 }
