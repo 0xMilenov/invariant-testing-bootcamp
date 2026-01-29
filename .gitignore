@@ -5,6 +5,12 @@
 /coverage/
 lcov.info
 
+# Crytic / Echidna
+/crytic-export/
+/echidna-corpus/
+/corpus/
+/echidna-workdir/
+
 # Editor / OS
 .DS_Store
 .idea/
