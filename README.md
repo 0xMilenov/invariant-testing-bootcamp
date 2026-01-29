@@ -1,38 +1,21 @@
 # Invariant Testing Bootcamp
 
-**Started:** 26 January 2026
+This repo contains my bootcamp homework, organized by week and project.
 
-## Exercises
+## Structure
 
-1. Scaffold ERC4626 vault → reach **90% coverage**
-   - [Solmate](https://github.com/transmissions11/solmate)
-2. Add stateful + stateless properties (ERC-4626 specs)
-3. Compare Echidna vs Foundry
-4. Explore Create Chimera App
-5. Find bugs!
+- `week-1/`
+  - `solmate/`
+    - `erc4626/` — Foundry project (coverage + stateless/stateful props + Echidna harness)
+    - `chimera-app` - Explore 'Create Chimera App' and compare
+  - `rewards-manager/` — (planned)
+- `week-2/` — (planned)
+- `week-3/` — (planned)
 
-## This repo (Week 1 / Exercise 1)
-
-- **Cloned target**: `src/erc4626/SolmateERC4626.sol` (local copy of Solmate’s `ERC4626`)
-- **Concrete vault for testing**: `src/mocks/MockERC4626.sol`
-- **Coverage-first test folder**: `test/erc4626/`
-
-## Commands
-
-### Build
+## Running Week 1 (Solmate ERC4626)
 
 ```bash
-forge build
-```
-
-### Run tests
-
-```bash
-forge test -vvv
-```
-
-### Coverage (goal: >90%)
-
-```bash
-forge coverage -vvv
+cd week-1/solmate/erc4626
+forge test
+forge coverage
 ```

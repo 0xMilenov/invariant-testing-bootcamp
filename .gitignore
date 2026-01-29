@@ -1,15 +1,15 @@
-# Foundry
-/out/
-/cache/
-/broadcast/
-/coverage/
+# Generated build artifacts (any nested Foundry projects)
+**/out/
+**/cache/
+**/broadcast/
+**/coverage/
 lcov.info
 
-# Crytic / Echidna
-/crytic-export/
-/echidna-corpus/
-/corpus/
-/echidna-workdir/
+# Crytic / Echidna artifacts
+**/crytic-export/
+**/echidna-corpus/
+**/corpus/
+**/echidna-workdir/
 
 # Editor / OS
 .DS_Store
