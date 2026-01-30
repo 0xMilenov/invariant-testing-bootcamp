@@ -1,3 +1,4 @@
 forge-std/=lib/forge-std/src/
 @chimera/=lib/chimera/src/
 @recon/=lib/setup-helpers/src/
+solmate/=../erc4626/lib/solmate/src/
