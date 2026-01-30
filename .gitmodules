@@ -13,3 +13,6 @@
 [submodule "week-1/solmate/chimera-app/lib/setup-helpers"]
 	path = week-1/solmate/chimera-app/lib/setup-helpers
 	url = https://github.com/Recon-Fuzz/setup-helpers
+[submodule "week-1/solmate/chimera-app/lib/solmate"]
+	path = week-1/solmate/chimera-app/lib/solmate
+	url = https://github.com/transmissions11/solmate
