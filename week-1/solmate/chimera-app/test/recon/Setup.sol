@@ -13,24 +13,44 @@ import {AssetManager} from "@recon/AssetManager.sol";
 import {Utils} from "@recon/Utils.sol";
 
 // Your deps
-import "src/Counter.sol";
+import {MockERC20} from "src/mocks/MockERC20.sol";
+import {MockERC4626} from "src/mocks/MockERC4626.sol";
 
 abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
-    Counter counter;
+
+    MockERC20 asset;
+    MockERC4626 vault;
+
+    address internal alice;
+    address internal bob;
+
+    uint256 internal initialTrackedAssetSum;
 
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
     function setup() internal virtual override {
-        // New Actor, beside address(this)
-        _addActor(address(0x411c3));
-        _newAsset(18); // New 18 decimals token
 
-        counter = new Counter();
+        alice = address(0xA11CE);
+        bob = address(0xB0B);
 
-        // Mints to all actors and approves allowances to the counter
-        address[] memory approvalArray = new address[](1);
-        approvalArray[0] = address(counter);
-        _finalizeAssetDeployment(_getActors(), approvalArray, type(uint88).max);
+        _addActor(alice);
+        _addActor(bob);
+        
+        _switchActor(1);
+
+        asset = new MockERC20("Asset", "AST", 18);
+        vault = new MockERC4626(asset, "Vault Share", "vAST");
+
+        asset.mint(alice, 1_000_000e18);
+        asset.mint(bob, 1_000_000e18);
+
+        // will this work for echidna?
+        vm.prank(alice);
+        asset.approve(address(vault), type(uint256).max);
+        vm.prank(bob);
+        asset.approve(address(vault), type(uint256).max);
+
+        initialTrackedAssetSum = asset.balanceOf(alice) + asset.balanceOf(bob) + asset.balanceOf(address(vault));
     }
 
     /// === MODIFIERS === ///
@@ -42,7 +62,8 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
     }
 
     modifier asActor {
-        vm.prank(address(_getActor()));
+        vm.startPrank(_getActor());
         _;
+        vm.stopPrank();
     }
 }

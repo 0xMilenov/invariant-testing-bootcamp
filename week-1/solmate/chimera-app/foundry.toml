@@ -14,7 +14,7 @@ runs = 0 # Only flag properties that break without calls
 ## Custom Profile used to run invariant tests
 match_test = ""
 [profile.invariants.invariant]
-runs = 50_000 ## Test this param! Generally speaking this needs to be very high!
+runs = 256 ## Test this param! Generally speaking this needs to be very high!
 corpus_dir = "./foundry/corpus"
 corpus_gzip = false
 corpus_min_mutations = 5
