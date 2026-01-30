@@ -1,23 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
-// Chimera deps
-import {vm} from "@chimera/Hevm.sol";
-
-// Helpers
-import {Panic} from "@recon/Panic.sol";
-
 // Targets
+import {Actor} from "./Setup.sol";
 import {Properties} from "./Properties.sol";
 
 abstract contract TargetFunctions is Properties {
-   function switchActor(uint256 entropy) public {
-        uint256 n = _getActors().length;
-        if (n == 0) return;
-        _switchActor(entropy % n);
-}
+    function switchActor(uint256 entropy) public {
+        _switchActor((entropy % 2) + 1); // 1 => alice, 2 => bob
+    }
 
-   function vault_deposit(uint256 assetsIn) public updateGhosts asActor {
+    function vault_deposit(uint256 assetsIn) public updateGhosts {
         address a = _getActor();
 
         uint256 bal = asset.balanceOf(a);
@@ -26,10 +19,10 @@ abstract contract TargetFunctions is Properties {
         if (assetsIn == 0) return;
         if (vault.previewDeposit(assetsIn) == 0) return;
 
-        vault.deposit(assetsIn, a);
-   }
+        Actor(a).deposit(assetsIn);
+    }
 
-   function vault_mint(uint256 sharesOut) public updateGhosts asActor {
+    function vault_mint(uint256 sharesOut) public updateGhosts {
         address a = _getActor();
 
         sharesOut = between(sharesOut, 0, 1_000_000e18);
@@ -41,10 +34,10 @@ abstract contract TargetFunctions is Properties {
 
         if (assetsIn > asset.balanceOf(a)) return;
 
-        vault.mint(sharesOut, a);
+        Actor(a).mint(sharesOut);
     }
 
-    function vault_withdraw(uint256 shares) public updateGhosts asActor {
+    function vault_withdraw(uint256 shares) public updateGhosts {
         address a = _getActor();
 
         uint256 maxShares = vault.maxRedeem(a);
@@ -56,10 +49,10 @@ abstract contract TargetFunctions is Properties {
         uint256 assetsOut = vault.convertToAssets(shares);
         if (assetsOut == 0) return;
 
-        vault.withdraw(assetsOut, a, a);
+        Actor(a).withdraw(assetsOut);
     }
 
-    function vault_redeem(uint256 shares) public updateGhosts asActor {
+    function vault_redeem(uint256 shares) public updateGhosts {
         address a = _getActor();
 
         uint256 maxShares = vault.maxRedeem(a);
@@ -70,7 +63,7 @@ abstract contract TargetFunctions is Properties {
 
         if (vault.previewRedeem(shares) == 0) return;
 
-        vault.redeem(shares, a, a);
+        Actor(a).redeem(shares);
     }
 
 }
