@@ -16,3 +16,15 @@
 [submodule "week-1/solmate/chimera-app/lib/solmate"]
 	path = week-1/solmate/chimera-app/lib/solmate
 	url = https://github.com/transmissions11/solmate
+[submodule "week-1/rewards-manager/lib/forge-std"]
+	path = week-1/rewards-manager/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "week-1/rewards-manager/lib/chimera"]
+	path = week-1/rewards-manager/lib/chimera
+	url = https://github.com/Recon-Fuzz/chimera
+[submodule "week-1/rewards-manager/lib/openzeppelin-contracts"]
+	path = week-1/rewards-manager/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "week-1/rewards-manager/lib/setup-helpers"]
+	path = week-1/rewards-manager/lib/setup-helpers
+	url = https://github.com/Recon-Fuzz/setup-helpers

@@ -1,0 +1,4 @@
+forge-std/=lib/forge-std/src/
+@openzeppelin/=lib/openzeppelin-contracts/contracts/
+@chimera/=lib/chimera/src/
+@recon/=lib/setup-helpers/src/
