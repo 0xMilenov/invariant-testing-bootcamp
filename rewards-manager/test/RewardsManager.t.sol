@@ -234,4 +234,332 @@ contract RewardsManagerTest is Test {
     assertGt(rewardToken.balanceOf(alice), 0);
   }
 
+  function test_addReward_revertsIfVaultZero() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+    uint256 amount = 100e18;
+
+    vm.startPrank(sponsor);
+    rewardToken.mint(sponsor, amount);
+    rewardToken.approve(address(rewardsManager), amount);
+
+    vm.expectRevert(bytes("youtu.be/F3L376eH09Q"));
+    rewardsManager.addReward(epochId, address(0), address(rewardToken), amount);
+    vm.stopPrank();
+  }
+
+  function test_addReward_feeOnTransfer_creditsByBalanceDelta() external {
+    uint256 epochId = rewardsManager.currentEpoch() + 1;
+    uint256 amount = 100e18;
+
+    vm.startPrank(sponsor);
+    fotRewardToken.mint(sponsor, amount);
+    fotRewardToken.approve(address(rewardsManager), amount);
+    rewardsManager.addReward(epochId, address(vault), address(fotRewardToken), amount);
+    vm.stopPrank();
+
+    uint256 credited = rewardsManager.rewards(epochId, address(vault), address(fotRewardToken));
+    assertGt(credited, 0);
+    assertLt(credited, amount); // because of the fee
+  }
+
+  function test_notifyTransfer_revertsIfFromEqualsTo() external {
+    vm.prank(address(vault));
+    vm.expectRevert(bytes("Cannot transfer to yourself"));
+    rewardsManager.notifyTransfer(alice, alice, 1);
+  }
+
+  function test_futureEpoch_guards() external {
+    uint256 futureEpoch = rewardsManager.currentEpoch() + 1;
+
+    vm.expectRevert(bytes("Cannot see the future"));
+    rewardsManager.accrueVault(futureEpoch, address(vault));
+
+    vm.expectRevert(bytes("Cannot see the future"));
+    rewardsManager.getVaultTimeLeftToAccrue(futureEpoch, address(vault));
+
+    vm.expectRevert(bytes("Cannot see the future"));
+    rewardsManager.getTotalSupplyAtEpoch(futureEpoch, address(vault));
+
+    vm.expectRevert(bytes("Cannot see the future"));
+    rewardsManager.getBalanceAtEpoch(futureEpoch, address(vault), alice);
+
+    vm.expectRevert(bytes("only ended epochs"));
+    rewardsManager.accrueUser(futureEpoch, address(vault), alice);
+  }
+
+  function test_addBulkRewardsLinearly_mustDivideEvenly() external {
+    uint256 start = rewardsManager.currentEpoch() + 1;
+    uint256 end = start + 2; // epoch 3
+    uint256 total = 100e18; // not divisible by 3
+
+    vm.startPrank(sponsor);
+    rewardToken.mint(sponsor, total);
+    rewardToken.approve(address(rewardsManager), total);
+
+    vm.expectRevert(bytes("must divide evenly"));
+    rewardsManager.addBulkRewardsLinearly(start, end, address(vault), address(rewardToken), total);
+    vm.stopPrank();
+  }
+
+  function test_addBulkRewardsLinearly_noFeeOOnTransfer() external {
+     uint256 start = rewardsManager.currentEpoch() + 1;
+    uint256 end = start; // epoch 1
+    uint256 total = 100e18;
+
+    vm.startPrank(sponsor);
+    fotRewardToken.mint(sponsor, total);
+    fotRewardToken.approve(address(rewardsManager), total);
+
+    vm.expectRevert(bytes("no feeOnTransfer"));
+    rewardsManager.addBulkRewardsLinearly(start, end, address(vault), address(fotRewardToken), total);
+    vm.stopPrank();
+  }
+
+  function test_addBulkRewards_lengthMismatch() external {
+    uint256 start = rewardsManager.currentEpoch() + 1;
+    uint256 end = start + 1; // 2 epochs
+
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = 1e18;
+
+    vm.startPrank(sponsor);
+    rewardToken.mint(sponsor, 1e18);
+    rewardToken.approve(address(rewardsManager), 1e18);
+
+    vm.expectRevert(bytes("length mismatch"));
+    rewardsManager.addBulkRewards(start, end, address(vault), address(rewardToken), amounts);
+    vm.stopPrank();
+  }
+
+  function test_claimRewards_lengthMismatch_reverts() external {
+    uint256[] memory epochs = new uint256[](1);
+    address[] memory vaults = new address[](2);
+    address[] memory tokens = new address[](1);
+    address[] memory users = new address[](1);
+
+    epochs[0] = 1;
+    vaults[0] = address(vault);
+    vaults[1] = address(vault);
+    tokens[0] = address(rewardToken);
+    users[0] = alice;
+
+    vm.expectRevert(bytes("length mismatch"));
+    rewardsManager.claimRewards(epochs, vaults, tokens, users);
+  }
+
+  function test_claimRewardsEmitting_worksWhenRewardsManagerHasShares() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+
+    _fundRewardToken(address(rewardToken), epochId, 100e18);
+
+    _warpToEpochStartPlus1(epochId);
+    vault.mintShares(address(rewardsManager), 100e18);
+    vault.mintShares(alice, 10e18);
+
+    _warpToAfterEpochEnd(epochId);
+
+    uint256 before = rewardToken.balanceOf(alice);
+    rewardsManager.claimRewardEmitting(epochId, address(vault), address(rewardToken), alice);
+    assertGt(rewardToken.balanceOf(alice) - before, 0);
+
+    vm.expectRevert(bytes("already claimed"));
+    rewardsManager.claimRewardEmitting(epochId, address(vault), address(rewardToken), alice);
+  }
+
+  function test_addBulkRewardsLinearly_success_splitsEvenly() external {
+    uint256 start = rewardsManager.currentEpoch() + 1;
+    uint256 end = start + 2; // epoch 3
+    uint256 total = 300e18; // divisible by 3
+    uint256 perEpoch = total / 3;
+
+    vm.startPrank(sponsor);
+    rewardToken.mint(sponsor, total);
+    rewardToken.approve(address(rewardsManager), total);
+
+    rewardsManager.addBulkRewardsLinearly(start, end, address(vault), address(rewardToken), total);
+    vm.stopPrank();
+
+    assertEq(rewardsManager.rewards(start, address(vault), address(rewardToken)), perEpoch);
+    assertEq(rewardsManager.rewards(start + 1, address(vault), address(rewardToken)), perEpoch);
+    assertEq(rewardsManager.rewards(start + 2, address(vault), address(rewardToken)), perEpoch);
+  }
+
+  function test_addBulkRewards_success_customAmounts() external {
+    uint256 start = rewardsManager.currentEpoch() + 1;
+    uint256 end = start + 1; // epoch 2
+
+    uint256[] memory amounts = new uint256[](2);
+    amounts[0] = 100e18;
+    amounts[1] = 200e18;
+
+    uint256 total = amounts[0] + amounts[1];
+
+    vm.startPrank(sponsor);
+    rewardToken.mint(sponsor, total);
+    rewardToken.approve(address(rewardsManager), total);
+
+    rewardsManager.addBulkRewards(start, end, address(vault), address(rewardToken), amounts);
+    vm.stopPrank();
+
+    assertEq(rewardsManager.rewards(start, address(vault), address(rewardToken)), amounts[0]);
+    assertEq(rewardsManager.rewards(start + 1, address(vault), address(rewardToken)), amounts[1]);
+  }
+
+  function test_getUserTimeLeftToAccrue_branches() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+    RewardsManager.Epoch memory epoch = _epoch(epochId);
+
+    // user has shares in this epoch
+    _warpToEpochStartPlus1(epochId);
+    vault.mintShares(alice, 10e18);
+
+    // lastUserAccrueTimestamp == 0
+    _warpToEpochStartPlus100(epochId);
+    uint256 t1 = rewardsManager.getUserTimeLeftToAccrue(epochId, address(vault), alice);
+    assertEq(t1, 100 - 1);
+
+    // force an accrue after epoch end so lastUserAccrueTimestamp >= epoch.endTimestamp
+    _warpToAfterEpochEnd(epochId);
+    rewardsManager.accrueUser(epochId, address(vault), alice);
+
+    // querying in same timestamp = 0
+    uint256 t2 = rewardsManager.getUserTimeLeftToAccrue(epochId, address(vault), alice);
+    assertEq(t2, 0);
+  }
+
+  function test_getVaultTimeLeftToAccrue_branches() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+    RewardsManager.Epoch memory epoch = _epoch(epochId);
+
+    _warpToEpochStartPlus1(epochId);
+    vault.mintShares(address(vault), 20e18);
+
+    // lastVaultAccrueTimestamp == 0
+    _warpToEpochStartPlus100(epochId);
+    uint256 t1 = rewardsManager.getVaultTimeLeftToAccrue(epochId, address(vault));
+    assertEq(t1, 100 - 1);
+
+    _warpToAfterEpochEnd(epochId);
+    rewardsManager.accrueVault(epochId, address(vault));
+
+    uint256 t2 = rewardsManager.getVaultTimeLeftToAccrue(epochId, address(vault));
+    assertEq(t2, 0);
+  }
+
+  function test_getTotalSupplyAtEpoch_lookback_shouldUpdateTrue() external {
+    uint256 epoch1 = rewardsManager.currentEpoch();
+    RewardsManager.Epoch memory e1 = _epoch(epoch1);
+
+    _warpToEpochStartPlus1(epoch1);
+    vault.mintShares(alice, 20e18);
+
+    _warpToEpochStartPlus100(epoch1);
+    rewardsManager.accrueVault(epoch1, address(vault));
+
+    _warpToAfterEpochEnd(epoch1);
+    uint256 epoch2 = rewardsManager.currentEpoch();
+
+    (uint256 supply2, bool shouldUpdate2) = rewardsManager.getTotalSupplyAtEpoch(epoch2, address(vault));
+    assertEq(supply2, 20e18);
+    assertEq(shouldUpdate2, true);
+  }
+
+  function test_getTotalSupplyAtEpoch_lookback_lastKnownZero_returnsNoUpdate() external {
+    uint256 epoch1 = rewardsManager.currentEpoch();
+    RewardsManager.Epoch memory e1 = _epoch(epoch1);
+
+    _warpToEpochStartPlus1(epoch1);
+    vault.mintShares(alice, 5e18);
+
+    vm.warp(e1.startTimestamp + 10);
+    vault.burnShares(alice, 5e18);
+
+    vm.warp(e1.startTimestamp + 20);
+    rewardsManager.accrueVault(epoch1, address(vault));
+
+    _warpToAfterEpochEnd(epoch1);
+    uint256 epoch2 = rewardsManager.currentEpoch();
+
+    (uint256 supply2, bool shouldUpdate2) = rewardsManager.getTotalSupplyAtEpoch(epoch2, address(vault));
+    assertEq(supply2, 0);
+    assertEq(shouldUpdate2, false);
+  }
+
+  function test_claimRewardReferenceEmitting_paysThenReturnsOnSecondCall() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+
+    _fundRewardToken(address(rewardToken), epochId, 100e18);
+
+    _warpToEpochStartPlus1(epochId);
+    vault.mintShares(alice, 1e18);
+
+    _warpToAfterEpochEnd(epochId);
+
+    uint256 before = rewardToken.balanceOf(alice);
+    rewardsManager.claimRewardReferenceEmitting(epochId, address(vault), address(rewardToken), alice);
+    uint256 paid1 = rewardToken.balanceOf(alice) - before;
+    assertGt(paid1, 0);
+
+    uint256 before2 = rewardToken.balanceOf(alice);
+    rewardsManager.claimRewardReferenceEmitting(epochId, address(vault), address(rewardToken), alice);
+    uint256 paid2 = rewardToken.balanceOf(alice) - before2;
+    assertEq(paid2, 0);
+  }
+
+  function test_claimRewards_success_loop() external {
+    uint256 epochId = rewardsManager.currentEpoch();
+
+    _fundRewardToken(address(rewardToken), epochId, 100e18);
+
+    _warpToEpochStartPlus1(epochId);
+    vault.mintShares(alice, 1e18);
+
+    _warpToAfterEpochEnd(epochId);
+
+    uint256[] memory epochs = new uint256[](1);
+    address[] memory vaults = new address[](1);
+    address[] memory tokens = new address[](1);
+    address[] memory users = new address[](1);
+
+    epochs[0] = epochId;
+    vaults[0] = address(vault);
+    tokens[0] = address(rewardToken);
+    users[0] = alice;
+
+    rewardsManager.claimRewards(epochs, vaults, tokens, users);
+    assertGt(rewardToken.balanceOf(alice), 0);
+  }
+
+  function test_claimBulkTokensOverMultipleEpochs_success_and_dupRevert() external {
+    uint256 epoch1 = rewardsManager.currentEpoch();
+
+    _fundRewardToken(address(rewardToken), epoch1, 50e18);
+
+    _warpToEpochStartPlus1(epoch1);
+    vault.mintShares(alice, 2e18);
+
+    _warpToAfterEpochEnd(epoch1);
+    uint256 epoch2 = rewardsManager.currentEpoch();
+    _fundRewardToken(address(rewardToken), epoch2, 25e18);
+
+    _warpToEpochStartPlus1(epoch2);
+    vault.mintShares(alice, 1e18);
+
+    _warpToAfterEpochEnd(epoch2);
+
+    address[] memory tokens = new address[](1);
+    tokens[0] = address(rewardToken);
+
+    uint256 before = rewardToken.balanceOf(alice);
+    rewardsManager.claimBulkTokensOverMultipleEpochs(epoch1, epoch2, address(vault), tokens, alice);
+    uint256 paid = rewardToken.balanceOf(alice) - before;
+    assertGt(paid, 0);
+
+    address[] memory dupTokens = new address[](2);
+    dupTokens[0] = address(rewardToken);
+    dupTokens[1] = address(rewardToken);
+
+    vm.expectRevert(bytes("dup"));
+    rewardsManager.claimBulkTokensOverMultipleEpochs(epoch1, epoch2, address(vault), dupTokens, alice);
+  }
 }
