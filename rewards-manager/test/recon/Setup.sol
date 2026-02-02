@@ -51,10 +51,10 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
     RewardsManager rewardsManager;
     
     // multiple vaults
-    MockVault[] deployedVaults;
+    MockVault[] internal deployedVaults;
 
     // structs
-    RewardsManager.OptimizedClaimParams optimizedClaimParams;
+    RewardsManager.OptimizedClaimParams internal optimizedClaimParams;
     
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
@@ -68,7 +68,7 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
 
         _newAsset(uint8(DECIMALS));
 
-        MockVault mockVault = new MockVault(address(rewardsManager));
+        MockVault mockVault = new MockVault(rewardsManager);
         deployedVaults.push(mockVault);
 
         address[] memory emptyTokens = new address[](0);
@@ -87,7 +87,7 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
     }
 
     function helper_deployVault() public {
-        MockVault newVault = new MockVault(address(rewardsManager));
+        MockVault newVault = new MockVault(rewardsManager);
         deployedVaults.push(newVault);
     }
 
