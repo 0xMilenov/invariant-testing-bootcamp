@@ -25,4 +25,8 @@ abstract contract Properties is BeforeAfter, Asserts {
         uint256 currentSum = asset.balanceOf(alice) + asset.balanceOf(bob) + asset.balanceOf(address(vault));
         eq(currentSum, initialTrackedAssetSum, "tracked asset sum changed");
     }
+
+    function property_user_cannot_change_price_per_share() public {
+        eq(_before.pricePerShare, _after.pricePerShare, "price per share should not change with user operations");
+    }
 }

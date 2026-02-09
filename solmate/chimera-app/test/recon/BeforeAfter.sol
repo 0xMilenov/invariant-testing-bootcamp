@@ -9,6 +9,7 @@ abstract contract BeforeAfter is Setup {
         uint256 vault_totalAssets;
         uint256 vault_totalSupply;
         uint256 vault_assetBalance;
+        uint256 pricePerShare;
 
         uint256 alice_shares;
         uint256 bob_shares;
@@ -34,6 +35,8 @@ abstract contract BeforeAfter is Setup {
         _before.bob_shares = vault.balanceOf(bob);
 
         _before.trackedAssetSum = asset.balanceOf(alice) + asset.balanceOf(bob) + asset.balanceOf(address(vault));
+
+        _before.pricePerShare = vault.convertToShares(10 ** asset.decimals());
     }
 
     function __after() internal {
@@ -45,5 +48,7 @@ abstract contract BeforeAfter is Setup {
         _after.bob_shares = vault.balanceOf(bob);
 
         _after.trackedAssetSum = asset.balanceOf(alice) + asset.balanceOf(bob) + asset.balanceOf(address(vault));
+
+        _after.pricePerShare = vault.convertToShares(10 ** asset.decimals());
     }
 }
